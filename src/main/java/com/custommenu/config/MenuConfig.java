@@ -1,0 +1,339 @@
+package com.custommenu.config;
+
+import com.custommenu.CustomMenuMod;
+import net.minecraftforge.common.ForgeConfigSpec;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.*;
+
+public class MenuConfig {
+    public static final ForgeConfigSpec SPEC;
+    public static final Config CONFIG;
+
+    public static Map<String, MenuData> menus = new HashMap<>();
+
+    static {
+        ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
+        CONFIG = new Config(builder);
+        SPEC = builder.build();
+    }
+
+    public static class Config {
+        public final ForgeConfigSpec.IntValue menuKey;
+        public final ForgeConfigSpec.IntValue tooltipOffsetX;
+        public final ForgeConfigSpec.IntValue tooltipOffsetY;
+        public final ForgeConfigSpec.IntValue maxMenus;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> menuList;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> defaultMenuItems;
+
+        public Config(ForgeConfigSpec.Builder builder) {
+            builder.comment("General Settings").push("general");
+
+            menuKey = builder
+                .comment("Menu key code (GLFW)")
+                .defineInRange("menuKey", 77, 0, 400);
+
+            tooltipOffsetX = builder
+                .comment("Tooltip X offset")
+                .defineInRange("tooltipOffsetX", 0, -100, 100);
+
+            tooltipOffsetY = builder
+                .comment("Tooltip Y offset")
+                .defineInRange("tooltipOffsetY", 0, -100, 100);
+
+            maxMenus = builder
+                .comment("Maximum number of menus")
+                .defineInRange("maxMenus", 10, 1, 50);
+
+            builder.pop();
+
+            builder.comment(
+                "Menu Definitions",
+                "Format: menuName;slots;title;keyCode",
+                "Example: default;27;Custom Menu;77",
+                "keyCode: -1 = no key, 77 = M key, 75 = K key"
+            ).push("menus");
+
+            menuList = builder
+                .comment("List of menus")
+                .defineList("menuList", 
+                    Arrays.asList("default;27;Custom Menu;77"),
+                    obj -> obj instanceof String);
+
+            defaultMenuItems = builder
+                .comment(
+                    "Menu Items for default menu",
+                    "Format: slot;itemName;displayName;command",
+                    "Example: 0;diamond;§bElmas;give @p minecraft:diamond 1"
+                )
+                .defineList("defaultMenuItems", 
+                    Arrays.asList(
+                        "0;diamond;§bElmas;give @p minecraft:diamond 1",
+                        "1;emerald;§aZümrüt;give @p minecraft:emerald 1"
+                    ),
+                    obj -> obj instanceof String);
+
+            builder.pop();
+        }
+    }
+
+    public static void loadMenus() {
+        menus.clear();
+
+        try {
+            Path configDir = Paths.get("config");
+            if (!Files.exists(configDir)) {
+                Files.createDirectories(configDir);
+            }
+
+            Path configPath = configDir.resolve("custommenu-menus.txt");
+
+            // Ensure config file exists
+            if (!Files.exists(configPath)) {
+                CustomMenuMod.LOGGER.info("Menu config file not found, creating default menus...");
+                createDefaultMenu();
+                saveMenus();
+                return;
+            }
+
+            // Read file line by line
+            List<String> lines = Files.readAllLines(configPath, StandardCharsets.UTF_8);
+            String currentMenu = null;
+
+            for (String line : lines) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) continue;
+
+                if (line.startsWith("MENU:")) {
+                    // Parse menu definition: MENU:name;slots;title;keyCode
+                    String menuData = line.substring(5);
+                    String[] parts = menuData.split(";");
+                    if (parts.length >= 3) {
+                        String menuName = parts[0].trim();
+                        int slots = Integer.parseInt(parts[1].trim());
+                        String title = parts[2].trim();
+                        int keyCode = parts.length >= 4 ? Integer.parseInt(parts[3].trim()) : -1;
+
+                        MenuData menu = new MenuData(menuName, slots, title, new ArrayList<>());
+                        menu.keyCode = keyCode;
+                        menus.put(menuName, menu);
+                        currentMenu = menuName;
+
+                        CustomMenuMod.LOGGER.debug("Loaded menu: {} with {} slots", menuName, slots);
+                    }
+                } else if (line.startsWith("ITEM:") && currentMenu != null) {
+                    // Parse item: ITEM:slot;itemName;displayName;command
+                    String itemData = line.substring(5);
+                    String[] parts = itemData.split(";", 4);
+                    if (parts.length >= 4) {
+                        int slot = Integer.parseInt(parts[0].trim());
+                        String itemName = parts[1].trim();
+                        String displayName = parts[2].trim();
+                        String command = parts[3].trim();
+
+                        MenuData menu = menus.get(currentMenu);
+                        if (menu != null) {
+                            menu.items.add(new MenuItem(slot, itemName, displayName, command));
+                        }
+                    }
+                }
+            }
+
+            // If no menus loaded, create default
+            if (menus.isEmpty()) {
+                CustomMenuMod.LOGGER.warn("No menus found in config, creating default menu");
+                createDefaultMenu();
+                saveMenus();
+            }
+
+            CustomMenuMod.LOGGER.info("Loaded {} menus from config", menus.size());
+
+        } catch (Exception e) {
+            CustomMenuMod.LOGGER.error("Failed to load menus from config", e);
+            e.printStackTrace();
+            createDefaultMenu();
+            saveMenus();
+        }
+    }
+
+    private static void createDefaultMenu() {
+        MenuData defaultMenu = new MenuData("default", 27, "Custom Menu", new ArrayList<>());
+        defaultMenu.items.add(new MenuItem(0, "diamond", "§bElmas", "give @p minecraft:diamond 1"));
+        defaultMenu.items.add(new MenuItem(1, "emerald", "§aZümrüt", "give @p minecraft:emerald 1"));
+        defaultMenu.keyCode = 77;
+        menus.put("default", defaultMenu);
+        CustomMenuMod.LOGGER.info("Created default menu");
+    }
+
+    public static boolean createMenu(String menuName, int slots, String title) {
+        if (menus.size() >= CONFIG.maxMenus.get()) {
+            return false;
+        }
+        if (menus.containsKey(menuName)) {
+            return false;
+        }
+        MenuData newMenu = new MenuData(menuName, slots, title, new ArrayList<>());
+        menus.put(menuName, newMenu);
+        saveMenus();
+        return true;
+    }
+
+    public static boolean deleteMenu(String name) {
+        if (menus.remove(name) != null) {
+            saveMenus();
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean updateMenuSlots(String menuName, int newSlots) {
+        MenuData menu = menus.get(menuName);
+        if (menu == null) {
+            return false;
+        }
+
+        // Remove items that are beyond the new slot count
+        menu.items.removeIf(item -> item.slot >= newSlots);
+        menu.slots = newSlots;
+
+        saveMenus();
+        return true;
+    }
+
+    public static MenuData getMenu(String name) {
+        return menus.get(name);
+    }
+
+    public static boolean setMenuKey(String menuName, int keyCode) {
+        MenuData menu = menus.get(menuName);
+        if (menu == null) {
+            return false;
+        }
+
+        for (MenuData m : menus.values()) {
+            if (m.keyCode == keyCode && !m.name.equals(menuName)) {
+                m.keyCode = -1;
+            }
+        }
+
+        menu.keyCode = keyCode;
+        saveMenus();
+        return true;
+    }
+
+    public static MenuData getMenuByKey(int keyCode) {
+        for (MenuData menu : menus.values()) {
+            if (menu.keyCode == keyCode) {
+                return menu;
+            }
+        }
+        return null;
+    }
+
+    public static void addMenuItem(String menuName, int slot, String item, String name, String command) {
+        MenuData menu = menus.get(menuName);
+        if (menu != null) {
+            menu.items.removeIf(i -> i.slot == slot);
+            menu.items.add(new MenuItem(slot, item, name, command));
+            saveMenus();
+        }
+    }
+
+    public static void removeMenuItem(String menuName, int slot) {
+        MenuData menu = menus.get(menuName);
+        if (menu != null) {
+            menu.items.removeIf(i -> i.slot == slot);
+            saveMenus();
+        }
+    }
+
+    public static void saveMenus() {
+        try {
+            Path configDir = Paths.get("config");
+            if (!Files.exists(configDir)) {
+                Files.createDirectories(configDir);
+            }
+
+            Path configPath = configDir.resolve("custommenu-menus.txt");
+
+            // Write directly to file - no backup files!
+            StringBuilder content = new StringBuilder();
+            content.append("# CustomMenu Configuration File\n");
+            content.append("# DO NOT EDIT MANUALLY - Use in-game commands\n");
+            content.append("# Format:\n");
+            content.append("# MENU:name;slots;title;keyCode\n");
+            content.append("# ITEM:slot;itemName;displayName;command\n");
+            content.append("\n");
+
+            // Save each menu and its items
+            for (MenuData menuData : menus.values()) {
+                content.append("MENU:")
+                    .append(menuData.name).append(";")
+                    .append(menuData.slots).append(";")
+                    .append(menuData.title).append(";")
+                    .append(menuData.keyCode)
+                    .append("\n");
+
+                // Save items for this menu
+                for (MenuItem item : menuData.items) {
+                    content.append("ITEM:")
+                        .append(item.slot).append(";")
+                        .append(item.itemName).append(";")
+                        .append(item.displayName).append(";")
+                        .append(item.command)
+                        .append("\n");
+                }
+
+                content.append("\n");
+                CustomMenuMod.LOGGER.debug("Saved menu '{}' with {} items", menuData.name, menuData.items.size());
+            }
+
+            // Write to file atomically - delete and recreate
+            if (Files.exists(configPath)) {
+                Files.delete(configPath);
+            }
+            Files.write(configPath, content.toString().getBytes(StandardCharsets.UTF_8), 
+                       StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+
+            CustomMenuMod.LOGGER.info("Saved {} menus to config file", menus.size());
+
+        } catch (Exception e) {
+            CustomMenuMod.LOGGER.error("Failed to save menus to config", e);
+            e.printStackTrace();
+        }
+    }
+
+    public static class MenuData {
+        public String name;
+        public int slots;
+        public String title;
+        public List<MenuItem> items;
+        public int keyCode = -1;
+
+        public MenuData(String name, int slots, String title, List<MenuItem> items) {
+            this.name = name;
+            this.slots = slots;
+            this.title = title;
+            this.items = items;
+        }
+    }
+
+    public static class MenuItem {
+        public int slot;
+        public String itemName;
+        public String displayName;
+        public String command;
+
+        public MenuItem(int slot, String itemName, String displayName, String command) {
+            this.slot = slot;
+            this.itemName = itemName;
+            this.displayName = displayName;
+            this.command = command;
+        }
+    }
+}

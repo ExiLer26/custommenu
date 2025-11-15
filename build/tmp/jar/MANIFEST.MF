@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Specification-Title: custommenu
+Specification-Vendor: Replit AI
+Specification-Version: 1
+Implementation-Title: custommenu
+Implementation-Version: 1.2.0
+Implementation-Vendor: Replit AI
+Implementation-Timestamp: 2025-11-15T23:08:09+0000
+

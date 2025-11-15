@@ -15,9 +15,11 @@ Bu proje, Minecraft 1.20.1 için özel menü mod'udur.
 - `/menu remove <menu> <slot>` - Menüden item çıkar
 - `/menu delete <isim>` - Menü sil
 - `/menu list` - Menüleri listele
+- `/menu reload` - config yeniden yükler.
 
 ## Tuş Bağlama
 - M tuşu ile varsayılan menüyü açabilirsiniz
+- K tuşu ile menu düzenleyici açabilirsiniz
 
 ## Build
 ```bash

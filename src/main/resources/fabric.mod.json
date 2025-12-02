@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "custommenu",
+  "version": "${version}",
+  "name": "Custom Menu",
+  "description": "Özelleştirilebilir menü modu - Fabric",
+  "authors": [
+    "Replit AI"
+  ],
+  "contact": {},
+  "license": "MIT",
+    "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.custommenu.CustomMenuMod"
+    ],
+    "client": [
+      "com.custommenu.CustomMenuModClient"
+    ]
+  },
+  "mixins": [],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "~1.20.1",
+    "java": ">=17",
+    "fabric-api": "*"
+  }
+}

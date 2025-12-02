@@ -1,7 +1,6 @@
 package com.custommenu.config;
 
 import com.custommenu.CustomMenuMod;
-import net.minecraftforge.common.ForgeConfigSpec;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -12,74 +11,27 @@ import java.nio.file.StandardOpenOption;
 import java.util.*;
 
 public class MenuConfig {
-    public static final ForgeConfigSpec SPEC;
-    public static final Config CONFIG;
-
     public static Map<String, MenuData> menus = new HashMap<>();
+    
+    private static int menuKey = 77;
+    private static int tooltipOffsetX = 0;
+    private static int tooltipOffsetY = 0;
+    private static int maxMenus = 10;
 
-    static {
-        ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
-        CONFIG = new Config(builder);
-        SPEC = builder.build();
+    public static int getMenuKey() {
+        return menuKey;
     }
-
-    public static class Config {
-        public final ForgeConfigSpec.IntValue menuKey;
-        public final ForgeConfigSpec.IntValue tooltipOffsetX;
-        public final ForgeConfigSpec.IntValue tooltipOffsetY;
-        public final ForgeConfigSpec.IntValue maxMenus;
-        public final ForgeConfigSpec.ConfigValue<List<? extends String>> menuList;
-        public final ForgeConfigSpec.ConfigValue<List<? extends String>> defaultMenuItems;
-
-        public Config(ForgeConfigSpec.Builder builder) {
-            builder.comment("General Settings").push("general");
-
-            menuKey = builder
-                .comment("Menu key code (GLFW)")
-                .defineInRange("menuKey", 77, 0, 400);
-
-            tooltipOffsetX = builder
-                .comment("Tooltip X offset")
-                .defineInRange("tooltipOffsetX", 0, -100, 100);
-
-            tooltipOffsetY = builder
-                .comment("Tooltip Y offset")
-                .defineInRange("tooltipOffsetY", 0, -100, 100);
-
-            maxMenus = builder
-                .comment("Maximum number of menus")
-                .defineInRange("maxMenus", 10, 1, 50);
-
-            builder.pop();
-
-            builder.comment(
-                "Menu Definitions",
-                "Format: menuName;slots;title;keyCode",
-                "Example: default;27;Custom Menu;77",
-                "keyCode: -1 = no key, 77 = M key, 75 = K key"
-            ).push("menus");
-
-            menuList = builder
-                .comment("List of menus")
-                .defineList("menuList", 
-                    Arrays.asList("default;27;Custom Menu;77"),
-                    obj -> obj instanceof String);
-
-            defaultMenuItems = builder
-                .comment(
-                    "Menu Items for default menu",
-                    "Format: slot;itemName;displayName;command",
-                    "Example: 0;diamond;§bElmas;give @p minecraft:diamond 1"
-                )
-                .defineList("defaultMenuItems", 
-                    Arrays.asList(
-                        "0;diamond;§bElmas;give @p minecraft:diamond 1",
-                        "1;emerald;§aZümrüt;give @p minecraft:emerald 1"
-                    ),
-                    obj -> obj instanceof String);
-
-            builder.pop();
-        }
+    
+    public static int getTooltipOffsetX() {
+        return tooltipOffsetX;
+    }
+    
+    public static int getTooltipOffsetY() {
+        return tooltipOffsetY;
+    }
+    
+    public static int getMaxMenus() {
+        return maxMenus;
     }
 
     public static void loadMenus() {
@@ -93,7 +45,6 @@ public class MenuConfig {
 
             Path configPath = configDir.resolve("custommenu-menus.txt");
 
-            // Ensure config file exists
             if (!Files.exists(configPath)) {
                 CustomMenuMod.LOGGER.info("Menu config file not found, creating default menus...");
                 createDefaultMenu();
@@ -101,7 +52,6 @@ public class MenuConfig {
                 return;
             }
 
-            // Read file line by line
             List<String> lines = Files.readAllLines(configPath, StandardCharsets.UTF_8);
             String currentMenu = null;
 
@@ -110,7 +60,6 @@ public class MenuConfig {
                 if (line.isEmpty() || line.startsWith("#")) continue;
 
                 if (line.startsWith("MENU:")) {
-                    // Parse menu definition: MENU:name;slots;title;keyCode
                     String menuData = line.substring(5);
                     String[] parts = menuData.split(";");
                     if (parts.length >= 3) {
@@ -127,7 +76,6 @@ public class MenuConfig {
                         CustomMenuMod.LOGGER.debug("Loaded menu: {} with {} slots", menuName, slots);
                     }
                 } else if (line.startsWith("ITEM:") && currentMenu != null) {
-                    // Parse item: ITEM:slot;itemName;displayName;command
                     String itemData = line.substring(5);
                     String[] parts = itemData.split(";", 4);
                     if (parts.length >= 4) {
@@ -144,7 +92,6 @@ public class MenuConfig {
                 }
             }
 
-            // If no menus loaded, create default
             if (menus.isEmpty()) {
                 CustomMenuMod.LOGGER.warn("No menus found in config, creating default menu");
                 createDefaultMenu();
@@ -171,7 +118,7 @@ public class MenuConfig {
     }
 
     public static boolean createMenu(String menuName, int slots, String title) {
-        if (menus.size() >= CONFIG.maxMenus.get()) {
+        if (menus.size() >= maxMenus) {
             return false;
         }
         if (menus.containsKey(menuName)) {
@@ -197,7 +144,6 @@ public class MenuConfig {
             return false;
         }
 
-        // Remove items that are beyond the new slot count
         menu.items.removeIf(item -> item.slot >= newSlots);
         menu.slots = newSlots;
 
@@ -261,7 +207,6 @@ public class MenuConfig {
 
             Path configPath = configDir.resolve("custommenu-menus.txt");
 
-            // Write directly to file - no backup files!
             StringBuilder content = new StringBuilder();
             content.append("# CustomMenu Configuration File\n");
             content.append("# DO NOT EDIT MANUALLY - Use in-game commands\n");
@@ -270,7 +215,6 @@ public class MenuConfig {
             content.append("# ITEM:slot;itemName;displayName;command\n");
             content.append("\n");
 
-            // Save each menu and its items
             for (MenuData menuData : menus.values()) {
                 content.append("MENU:")
                     .append(menuData.name).append(";")
@@ -279,7 +223,6 @@ public class MenuConfig {
                     .append(menuData.keyCode)
                     .append("\n");
 
-                // Save items for this menu
                 for (MenuItem item : menuData.items) {
                     content.append("ITEM:")
                         .append(item.slot).append(";")
@@ -293,7 +236,6 @@ public class MenuConfig {
                 CustomMenuMod.LOGGER.debug("Saved menu '{}' with {} items", menuData.name, menuData.items.size());
             }
 
-            // Write to file atomically - delete and recreate
             if (Files.exists(configPath)) {
                 Files.delete(configPath);
             }

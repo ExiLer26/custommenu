@@ -2,7 +2,6 @@ package com.custommenu.commands;
 
 import com.custommenu.config.MenuConfig;
 import com.custommenu.network.NetworkHandler;
-import com.custommenu.network.PacketOpenMenu;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -10,9 +9,70 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.PacketDistributor;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class MenuCommand {
+    private static final Map<String, Integer> KEY_NAME_TO_CODE = new HashMap<>();
+    private static final Map<Integer, String> KEY_CODE_TO_NAME = new HashMap<>();
+    
+    static {
+        addKey("A", 65);
+        addKey("B", 66);
+        addKey("C", 67);
+        addKey("D", 68);
+        addKey("E", 69);
+        addKey("F", 70);
+        addKey("G", 71);
+        addKey("H", 72);
+        addKey("I", 73);
+        addKey("J", 74);
+        addKey("K", 75);
+        addKey("L", 76);
+        addKey("M", 77);
+        addKey("N", 78);
+        addKey("O", 79);
+        addKey("P", 80);
+        addKey("Q", 81);
+        addKey("R", 82);
+        addKey("S", 83);
+        addKey("T", 84);
+        addKey("U", 85);
+        addKey("V", 86);
+        addKey("W", 87);
+        addKey("X", 88);
+        addKey("Y", 89);
+        addKey("Z", 90);
+        addKey("0", 48);
+        addKey("1", 49);
+        addKey("2", 50);
+        addKey("3", 51);
+        addKey("4", 52);
+        addKey("5", 53);
+        addKey("6", 54);
+        addKey("7", 55);
+        addKey("8", 56);
+        addKey("9", 57);
+        addKey("F1", 290);
+        addKey("F2", 291);
+        addKey("F3", 292);
+        addKey("F4", 293);
+        addKey("F5", 294);
+        addKey("F6", 295);
+        addKey("F7", 296);
+        addKey("F8", 297);
+        addKey("F9", 298);
+        addKey("F10", 299);
+        addKey("F11", 300);
+        addKey("F12", 301);
+    }
+    
+    private static void addKey(String name, int code) {
+        KEY_NAME_TO_CODE.put(name, code);
+        KEY_CODE_TO_NAME.put(code, name);
+    }
+    
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("menu")
             .requires(source -> source.hasPermission(0))
@@ -129,10 +189,7 @@ public class MenuCommand {
         }
 
         MenuConfig.MenuData menuData = MenuConfig.getMenu(name);
-        NetworkHandler.INSTANCE.send(
-            PacketDistributor.PLAYER.with(() -> player),
-            new PacketOpenMenu(name, menuData)
-        );
+        NetworkHandler.sendOpenMenuPacket(player, name, menuData);
         source.sendSuccess(() -> Component.literal("§aMenu '§e" + name + "§a' açılıyor..."), false);
         return 1;
     }
@@ -173,7 +230,8 @@ public class MenuCommand {
         source.sendSuccess(() -> Component.literal("§aMevcut Menüler:"), false);
         for (String name : MenuConfig.menus.keySet()) {
             MenuConfig.MenuData menu = MenuConfig.getMenu(name);
-            String keyInfo = menu.keyCode != -1 ? ", tuş: " + org.lwjgl.glfw.GLFW.glfwGetKeyName(menu.keyCode, 0) : "";
+            String keyName = KEY_CODE_TO_NAME.getOrDefault(menu.keyCode, null);
+            String keyInfo = keyName != null ? ", tuş: " + keyName : (menu.keyCode != -1 ? ", tuş kodu: " + menu.keyCode : "");
             source.sendSuccess(() -> Component.literal("§7- §e" + name + " §7(" + menu.title + ", " + menu.slots + " slot" + keyInfo + ")"), false);
         }
         return 1;
@@ -185,9 +243,9 @@ public class MenuCommand {
             return 0;
         }
 
-        int keyCode = getKeyCodeFromName(keyName.toUpperCase());
-        if (keyCode == -1) {
-            source.sendFailure(Component.literal("§cGeçersiz tuş adı: " + keyName));
+        Integer keyCode = KEY_NAME_TO_CODE.get(keyName.toUpperCase());
+        if (keyCode == null) {
+            source.sendFailure(Component.literal("§cGeçersiz tuş adı: " + keyName + ". Desteklenen tuşlar: A-Z, 0-9, F1-F12"));
             return 0;
         }
 
@@ -197,15 +255,6 @@ public class MenuCommand {
         } else {
             source.sendFailure(Component.literal("§cTuş atanamadı!"));
             return 0;
-        }
-    }
-
-    private static int getKeyCodeFromName(String keyName) {
-        try {
-            java.lang.reflect.Field field = org.lwjgl.glfw.GLFW.class.getField("GLFW_KEY_" + keyName);
-            return field.getInt(null);
-        } catch (Exception e) {
-            return -1;
         }
     }
 

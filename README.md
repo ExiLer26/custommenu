@@ -27,7 +27,7 @@ Bu proje, Minecraft 1.20.1 için özel menü mod'udur.
 ```
 
 ## Teknik Detaylar
-- Minecraft: 1.20.1
-- Forge: 47.3.0
-- Java: 17
-- ForgeGradle: 6.0+
+- Minecraft 1.20.1
+- Fabric Loader 0.15.11+
+- Fabric API 0.92.0+1.20.1
+- Java 17+

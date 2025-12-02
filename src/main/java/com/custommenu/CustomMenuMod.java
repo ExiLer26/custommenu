@@ -2,62 +2,34 @@ package com.custommenu;
 
 import com.custommenu.commands.MenuCommand;
 import com.custommenu.config.MenuConfig;
-import com.custommenu.handlers.KeyHandler;
 import com.custommenu.network.NetworkHandler;
-import com.mojang.logging.LogUtils;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-@Mod(CustomMenuMod.MODID)
-public class CustomMenuMod {
-    public static final String MODID = "custommenu";
-    public static final Logger LOGGER = LogUtils.getLogger();
+public class CustomMenuMod implements ModInitializer {
+    public static final String MOD_ID = "custommenu";
+    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-    public CustomMenuMod() {
-        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+    @Override
+    public void onInitialize() {
+        LOGGER.info("Custom Menu Mod initializing...");
         
-        modEventBus.addListener(this::commonSetup);
-        modEventBus.addListener(this::clientSetup);
-        modEventBus.addListener(KeyHandler::registerKeyBindings);
+        NetworkHandler.register();
         
-        MinecraftForge.EVENT_BUS.register(this);
-        
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, MenuConfig.SPEC);
-    }
-
-    private void commonSetup(final FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> {
-            NetworkHandler.register();
-            MenuConfig.loadMenus();
-            LOGGER.info("Custom Menu Mod initialized!");
-        });
-        
-        MinecraftForge.EVENT_BUS.addListener(this::onServerStarting);
-    }
-    
-    @SubscribeEvent
-    public void onServerStarting(net.minecraftforge.event.server.ServerStartingEvent event) {
         MenuConfig.loadMenus();
-        LOGGER.info("Menus reloaded on server start!");
-    }
-
-    private void clientSetup(final FMLClientSetupEvent event) {
-        event.enqueueWork(() -> {
-            LOGGER.info("Client setup complete!");
+        
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            MenuCommand.register(dispatcher);
         });
-    }
-
-    @SubscribeEvent
-    public void onCommandRegister(RegisterCommandsEvent event) {
-        MenuCommand.register(event.getDispatcher());
+        
+        ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            MenuConfig.loadMenus();
+            LOGGER.info("Menus reloaded on server start!");
+        });
+        
+        LOGGER.info("Custom Menu Mod initialized!");
     }
 }
